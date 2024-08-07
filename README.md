@@ -1,14 +1,22 @@
 # Mutual TLS over kubernetes/nginx ingress controller
 
 Requirements:
-* openssl
-* kind
-* docker
+* [openssl](https://www.openssl.org/)
+* [kind](https://kind.sigs.k8s.io/)
+* [docker](https://www.docker.com/)
+* [kubectl](https://kubernetes.io/pt-br/docs/reference/kubectl/)
 
+## What is mutual TLS(mTLS) ?
+
+Mutual TLS, or mTLS for short, is a method for mutual authentication. mTLS ensures that the parties at each end of a network connection are who they claim to be by verifying that they both have the correct private key. The information within their respective TLS certificates provides additional verification.
+
+Mutual TLS concept lies under the umbrella of **Zero Trust Policy** where strict identity verification is required for any client/person/device trying to access any resources in a private network.
+
+*Zero Trust means that no user, device, or network traffic is trusted by default, an approach that helps eliminate many security vulnerabilities.
 
 
 ## Create a kind cluster:
-Apply the code below:
+Apply the code below to create a kind cluster:
 ```
 cat <<EOF | kind create cluster --config=-
 kind: Cluster
@@ -39,7 +47,7 @@ kubectl --namespace ingress-nginx apply -f https://raw.githubusercontent.com/kub
 
 ## Deploy the app
 
-Create namespace to app:
+Create a namespace to app:
 <pre>
 kubectl create ns app
 </pre>
@@ -51,38 +59,37 @@ kubectl apply -f k8s/app/app-deploy.yaml
 </pre>
 
 
-## Add ssl in ingress
-
-Generate certificate using openssl:
+## Add TLS in ingress
+Generate self-signed server certificate for domain **test.localdev.me**:
 <pre>
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout server.key -out server.crt -subj “/CN=test.localdev.me/O=test.localdev.me”
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout server.key -out server.crt -subj '/CN=test.localdev.me/O=test.localdev.me'
 </pre>
 
-Let's create an secret file using the keys:
+Let's create a tls secret file using the keys:
 <pre>
-kubectl create secret tls localdev-tls --key server.key --cert server.crt
+kubectl -n app create secret tls localdev-tls --key server.key --cert server.crt
 </pre>
 
-Apply ingress file:
+Apply the ingress file:
 <pre>
 kubectl apply -f k8s/ingress/app-in-no-mtls.yaml
 </pre>
 
-It work's 
+It's working 🤩
 
 ![](./img/it-works.png)
 
 
 # Add mTLS in ingress
 
-First let’s create CA “Certificate Authority” cert to be used as our verification gate to the client requests:
+First, let's create the “Certificate Authority” CA certificate to be used as our verification gate for client requests:
 <pre>
 openssl req -x509 -sha256 -newkey rsa:4096 -keyout ca.key -out ca.crt -days 356 -nodes -subj '/CN=My Cert Authority'
 </pre>
 
-Then apply the CA as secret to kubernetes cluster
+Then apply the CA as secret to the kubernetes cluster:
 <pre>
-kubectl create secret generic ca-secret --from-file=ca.crt=ca.crt
+kubectl -n app create secret generic ca-secret --from-file=ca.crt=ca.crt
 </pre>
 
 Next we need to generate a client **Cert Signing Request** and client key:
@@ -95,28 +102,29 @@ Now we need to sign this CSR “Certificate Signing Request” with the CA to ge
 openssl x509 -req -sha256 -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -out client.crt
 </pre>
 
-Finally apply the ingress ingress resource to add client verification annotations, one of them is to refer to the CA secret “default/ca-secret” which is our verification authority:
+Finally apply the [ingress](./k8s/ingress/app-in-with-mtls.yaml) file with a client verification annotations, one of them is to refer to the CA secret "app/ca-secret" that was created before, which is our verification authority:
 
-use the command:
+Use the command below to apply the ingress file in cluster:
 <pre>
 kubectl apply -f k8s/ingress/app-in-with-mtls.yaml
 </pre>
 
-and we can see that it works:
+and we can see that it is working 🤩:
 
 ![](./img/mtls-applied.png)
 
 
-Let's teste call using the certificate
+Let's test the call using the certificate:
 
 <pre>
 curl -k https://test.localdev.me/ --key client.key --cert client.crt
 </pre>
 
-It work's:
+It is working 🤩:
 
 ![](./img/mtls-1.png)
 
-and we can see the status code is equal 200:
+and we can see that the HTTP status code is equal to 200:
 
 ![](./img//mtls-2.png)
+

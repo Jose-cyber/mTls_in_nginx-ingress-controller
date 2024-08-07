@@ -1,13 +1,13 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: app-in-no-mtls 
+  name: app-in
   namespace: app
   annotations:
-    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true"
-    nginx.ingress.kubernetes.io/auth-tls-secret: default/ca-secret
-    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
-    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+    nginx.ingress.kubernetes.io/auth-tls-pass-certificate-to-upstream: "true" # pass certificate to app
+    nginx.ingress.kubernetes.io/auth-tls-secret: app/ca-secret # CA created as secret
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "off" # Enables verification of client certificates options: optional_no_ca,off,optional
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1" # The validation depth between the provided client certificate and the Certification Authority chain. (default: 1)
 spec:
   ingressClassName: nginx
   rules:
